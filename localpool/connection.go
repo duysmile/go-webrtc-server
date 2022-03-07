@@ -2,6 +2,7 @@ package localpool
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -12,9 +13,9 @@ import (
 const (
 	writeWait = 10 * time.Second
 
-	pongWait = 60 * time.Second
+	pongWait = 15 * time.Second
 
-	pingPeriod = pongWait * 9 / 10
+	pingPeriod = 10 * time.Second
 
 	maxMessageSize = 512
 )
@@ -44,6 +45,7 @@ func (c *Client) readMessage() {
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(_ string) error {
+		fmt.Println("pong")
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
@@ -95,6 +97,7 @@ func (c *Client) writeMessage() {
 				return
 			}
 		case <-ticker.C:
+			fmt.Println("send ping")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
@@ -104,6 +107,9 @@ func (c *Client) writeMessage() {
 }
 
 func ServeWs(pool *Pool, w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
